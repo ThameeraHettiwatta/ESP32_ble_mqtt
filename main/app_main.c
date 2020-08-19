@@ -59,10 +59,14 @@ static esp_ble_scan_params_t ble_scan_params = {
 
 typedef struct {
 	int16_t sensor_id;
+    uint8_t seq_no;
 	int16_t sensor_rssi;
 	int16_t sensor_acc[3];
     int16_t sensor_gyro[3];
     int16_t sensor_mag[3];
+    float acc[3];
+    float gyro[3];
+    float mag[3];
 } sensor_data;
 
 sensor_data data_t;
@@ -71,12 +75,12 @@ esp_mqtt_client_handle_t client;
 
 uint8_t mac[6];
 
-static int seq_no = 0;
+// static int seq_no = 0;
 
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
     esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
+    // int msg_id;
     // your_context_t *context = event->context;
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
@@ -135,7 +139,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 static void mqtt_app_start(void)
 {
     esp_mqtt_client_config_t mqtt_cfg = {
-        .uri = "mqtt://twhkvnkt:0qLBb25EOa3T@m11.cloudmqtt.com:17595",
+        .uri = "mqtt://mqtt_server:1234@192.168.8.102:1883",
     };
 
     client = esp_mqtt_client_init(&mqtt_cfg);
@@ -177,7 +181,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                         return;
                     } else {   
                         
-                        int nework_id;
+                        // int nework_id;
                         int data_len;
                         // The received adv data is a correct eddystone frame packet.
                         // Here, we get the eddystone infomation in eddystone_res, we can use the data in res to do other things.
@@ -187,25 +191,39 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                         // ESP_LOGI(DEMO_TAG, "RSSI of packet:%d dbm", scan_result->scan_rst.rssi);
                         // ESP_LOGI(DEMO_TAG, "Data length: %d ", (int) scan_result->scan_rst.adv_data_len);
                         // esp_log_buffer_hex("Beacon_DEMO: data:", scan_result->scan_rst.ble_adv, (int) scan_result->scan_rst.adv_data_len);
-                        nework_id = scan_result->scan_rst.ble_adv[4];
+                        // nework_id = scan_result->scan_rst.ble_adv[3];
                         data_len = scan_result->scan_rst.adv_data_len;
-                        if(nework_id == 0xb1 && data_len == 24 ){
-                            ESP_LOGI(DEMO_TAG, "--------found id----------");
+                        if( data_len == 22 ){
+                            // ESP_LOGI(DEMO_TAG, "--------found id----------");
+                            ESP_LOGI(DEMO_TAG, "--------Beacon Found----------");
+                            esp_log_buffer_hex("Beacon_DEMO: Device address:", scan_result->scan_rst.bda, ESP_BD_ADDR_LEN);
+                            ESP_LOGI(DEMO_TAG, "RSSI of packet:%d dbm", scan_result->scan_rst.rssi);
+                            ESP_LOGI(DEMO_TAG, "Data length: %d ", (int) scan_result->scan_rst.adv_data_len);
+                            esp_log_buffer_hex("Beacon_DEMO: data:", scan_result->scan_rst.ble_adv, (int) scan_result->scan_rst.adv_data_len);
                             data_t.sensor_rssi = scan_result->scan_rst.rssi;
-                            data_t.sensor_id = scan_result->scan_rst.ble_adv[1] | (scan_result->scan_rst.ble_adv[2]) << 8;
+                            data_t.seq_no = scan_result->scan_rst.ble_adv[1];
+                            data_t.sensor_id = scan_result->scan_rst.ble_adv[2] | (scan_result->scan_rst.ble_adv[3]) << 8;
                             int i;
                             for( i=0; i<3; i++){
-                                data_t.sensor_acc[i] = scan_result->scan_rst.ble_adv[i*2+6] <<8 | scan_result->scan_rst.ble_adv[i*2+7];
-                                data_t.sensor_gyro[i] = scan_result->scan_rst.ble_adv[i*2+12] <<8 | scan_result->scan_rst.ble_adv[i*2+13];
-                                data_t.sensor_mag[i] = scan_result->scan_rst.ble_adv[i*2+18] <<8 | scan_result->scan_rst.ble_adv[i*2+19];
+                                data_t.sensor_acc[i] = scan_result->scan_rst.ble_adv[i*2+5] <<8 | scan_result->scan_rst.ble_adv[i*2+6];
+                                data_t.sensor_gyro[i] = scan_result->scan_rst.ble_adv[i*2+11] <<8 | scan_result->scan_rst.ble_adv[i*2+12];
+                                data_t.sensor_mag[i] = scan_result->scan_rst.ble_adv[i*2+17] <<8 | scan_result->scan_rst.ble_adv[i*2+18];
                             }
-                            seq_no++;
+                            
+                            for( i=0; i<3; i++){
+                            //-- calculate acceleration, unit G, range -16, +16    
+                            data_t.acc[i] = (data_t.sensor_acc[i] * 1.0) / (32768/16);
+                            //-- calculate rotation, unit deg/s, range -250, +250
+                            data_t.gyro[i] = (data_t.sensor_gyro[i] * 1.0) / (65536 / 500);
+                            }
+
+                            // seq_no++;
                             char cPayload[500];
                             sprintf(cPayload,
-                                "{\"seq_no\": %d, \"esp_mac\": %02X:%02X:%02X:%02X:%02X:%02X, \"sensor_id\": %d, \"rssi\": %d, \"sensor_acc_x\": %d, \"sensor_acc_y\": %d, \"sensor_acc_z\": %d, \"sensor_gyro_x\": %d, \"sensor_gyro_y\": %d, \"sensor_gyro_z\": %d, \"sensor_mag_x\": %d, \"sensor_mag_y\": %d, \"sensor_mag_z\": %d}",
-                                seq_no, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], data_t.sensor_id, data_t.sensor_rssi, 
-                                data_t.sensor_acc[0], data_t.sensor_acc[1], data_t.sensor_acc[2], 
-                                data_t.sensor_gyro[0], data_t.sensor_gyro[1], data_t.sensor_gyro[2],
+                                "{\"seq_no\": %d, \"esp_mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\", \"sensor_id\": %d, \"rssi\": %d, \"sensor_acc_x\": %f, \"sensor_acc_y\": %f, \"sensor_acc_z\": %f, \"sensor_gyro_x\": %f, \"sensor_gyro_y\": %f, \"sensor_gyro_z\": %f, \"sensor_mag_x\": %d, \"sensor_mag_y\": %d, \"sensor_mag_z\": %d}",
+                                data_t.seq_no, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], data_t.sensor_id, data_t.sensor_rssi, 
+                                data_t.acc[0], data_t.acc[1], data_t.acc[2], 
+                                data_t.gyro[0], data_t.gyro[1], data_t.gyro[2],
                                 data_t.sensor_mag[0], data_t.sensor_mag[1], data_t.sensor_mag[2]);
                             esp_mqtt_client_publish(client, "/topic/qos1", cPayload, 0, 1, 0);
                         }
