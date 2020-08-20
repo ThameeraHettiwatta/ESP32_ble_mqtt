@@ -139,6 +139,7 @@ static void mqtt_app_start(void)
     esp_mqtt_client_config_t mqtt_cfg = {
         .uri = "mqtt://mqtt_server:1234@192.168.43.187:1883", //lahiru
         //.uri = "mqtt://mqtt_server:1234@192.168.8.102:1883", //thameera
+
     };
 
     client = esp_mqtt_client_init(&mqtt_cfg);
@@ -183,6 +184,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                         // int nework_id;
                         int data_len;
                         uint16_t nework_id;
+
                         // The received adv data is a correct eddystone frame packet.
                         // Here, we get the eddystone infomation in eddystone_res, we can use the data in res to do other things.
                         // For example, just print them:
@@ -229,6 +231,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                             esp_mqtt_client_publish(client, "/topic/qos1", cPayload, 0, 1, 0);
                             //esp_log_buffer_hex("JSON data",cPayload,500);
                         }
+
                     }
                     break;
                 }
