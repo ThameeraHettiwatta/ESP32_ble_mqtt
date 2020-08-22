@@ -30,13 +30,13 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 
-#include "esp_gatt_defs.h"
+//#include "esp_gatt_defs.h"
 #include "esp_bt.h"
 #include "esp_log.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
 
-#include "esp_gattc_api.h"
+//#include "esp_gattc_api.h"
 #include "esp_gap_ble_api.h" //esp_ble_gap_register_callback(function), 
 
 
@@ -57,42 +57,63 @@ static esp_ble_scan_params_t ble_scan_params = {
     .scan_duplicate         = BLE_SCAN_DUPLICATE_DISABLE
 };
 
+typedef struct {
+    int16_t sensor_id;
+    uint8_t seq_no;
+    int16_t sensor_rssi;
+    int16_t sensor_acc[3];
+    int16_t sensor_gyro[3];
+    int16_t sensor_mag[3];
+    float acc[3];
+    float gyro[3];
+    float mag[3];
+} sensor_data;
+
+sensor_data data_t;
+
+esp_mqtt_client_handle_t client;
+
+uint8_t mac[6];
 
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
     esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
+    // int msg_id;
     // your_context_t *context = event->context;
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
-            ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+            // char cPayload[200];
+            // sprintf(cPayload,
+			// 	"{\"temp_c\": %d, \"pressure_hpa\": %d}",
+			// 	data_t.sensor_rssi, data_t.sensor_id);
+            // msg_id = esp_mqtt_client_publish(client, "/topic/qos1", cPayload, 0, 1, 0);
+            // ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
 
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+            // msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
+            // ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
-            msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
-            ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+            // msg_id = esp_mqtt_client_subscribe(client, "/topic/qos1", 1);
+            // ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
-            msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
-            ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
+            // msg_id = esp_mqtt_client_unsubscribe(client, "/topic/qos1");
+            // ESP_LOGI(TAG, "sent unsubscribe successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
             break;
 
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
-            ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
-            break;
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            break;
+        // case MQTT_EVENT_SUBSCRIBED:
+        //     ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+        //     msg_id = esp_mqtt_client_publish(client, "/topic/qos0", "data", 0, 0, 0);
+        //     ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+        //     break;
+        // case MQTT_EVENT_UNSUBSCRIBED:
+        //     ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        //     break;
+        // case MQTT_EVENT_PUBLISHED:
+        //     ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        //     break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(TAG, "MQTT_EVENT_DATA");
             printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
@@ -116,34 +137,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 static void mqtt_app_start(void)
 {
     esp_mqtt_client_config_t mqtt_cfg = {
-        .uri = "mqtt://twhkvnkt:0qLBb25EOa3T@m11.cloudmqtt.com:17595",
+        // .uri = "mqtt://mqtt_server:1234@192.168.43.187:1883", //lahiru
+        // .uri = "mqtt://mqtt_server:1234@192.168.8.102:1883", //thameera
+        .uri = "mqtt://twhkvnkt:0qLBb25EOa3T@m11.cloudmqtt.com:17595", //cloud mqtt
+
     };
-#if CONFIG_BROKER_URL_FROM_STDIN
-    char line[128];
 
-    if (strcmp(mqtt_cfg.uri, "FROM_STDIN") == 0) {
-        int count = 0;
-        printf("Please enter url of mqtt broker\n");
-        while (count < 128) {
-            int c = fgetc(stdin);
-            if (c == '\n') {
-                line[count] = '\0';
-                break;
-            } else if (c > 0 && c < 127) {
-                line[count] = c;
-                ++count;
-            }
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-        }
-        mqtt_cfg.uri = line;
-        printf("Broker url: %s\n", line);
-    } else {
-        ESP_LOGE(TAG, "Configuration mismatch: wrong broker url");
-        abort();
-    }
-#endif /* CONFIG_BROKER_URL_FROM_STDIN */
-
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
 }
@@ -181,14 +181,58 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                         // just return
                         return;
                     } else {   
+                        
+                        // int nework_id;
+                        int data_len;
+                        uint16_t nework_id;
+
                         // The received adv data is a correct eddystone frame packet.
                         // Here, we get the eddystone infomation in eddystone_res, we can use the data in res to do other things.
                         // For example, just print them:
-                        ESP_LOGI(DEMO_TAG, "--------Beacon Found----------");
-                        esp_log_buffer_hex("Beacon_DEMO: Device address:", scan_result->scan_rst.bda, ESP_BD_ADDR_LEN);
-                        ESP_LOGI(DEMO_TAG, "RSSI of packet:%d dbm", scan_result->scan_rst.rssi);
-                        ESP_LOGI(DEMO_TAG, "Data length: %d ", (int) scan_result->scan_rst.adv_data_len);
-                        esp_log_buffer_hex("Beacon_DEMO: data:", scan_result->scan_rst.ble_adv, (int) scan_result->scan_rst.adv_data_len);
+                        // ESP_LOGI(DEMO_TAG, "--------Beacon Found----------");
+                        // esp_log_buffer_hex("Beacon_DEMO: Device address:", scan_result->scan_rst.bda, ESP_BD_ADDR_LEN);
+                        // ESP_LOGI(DEMO_TAG, "RSSI of packet:%d dbm", scan_result->scan_rst.rssi);
+                        // ESP_LOGI(DEMO_TAG, "Data length: %d ", (int) scan_result->scan_rst.adv_data_len);
+                        // esp_log_buffer_hex("Beacon_DEMO: data:", scan_result->scan_rst.ble_adv, (int) scan_result->scan_rst.adv_data_len);
+                        // nework_id = scan_result->scan_rst.ble_adv[3];
+                        data_len = scan_result->scan_rst.adv_data_len;
+                        nework_id = (uint16_t) scan_result->scan_rst.ble_adv[1] | ((uint16_t) (scan_result->scan_rst.ble_adv[0])) << 8;
+                        if( data_len == 23 && nework_id == 0x1621){
+                            ESP_LOGI(DEMO_TAG, "--------Beacon Found----------");
+                            //esp_log_buffer_hex("Beacon_DEMO: Device address:", scan_result->scan_rst.bda, ESP_BD_ADDR_LEN);
+                            //ESP_LOGI(DEMO_TAG, "RSSI of packet:%d dbm", scan_result->scan_rst.rssi);
+                            //ESP_LOGI(DEMO_TAG, "Data length: %d ", (int) scan_result->scan_rst.adv_data_len);
+                            //esp_log_buffer_hex("Beacon_DEMO: data:", scan_result->scan_rst.ble_adv, (int) scan_result->scan_rst.adv_data_len);
+                            data_t.sensor_rssi = scan_result->scan_rst.rssi;
+                            data_t.seq_no = scan_result->scan_rst.ble_adv[2];
+                            data_t.sensor_id = (uint16_t)scan_result->scan_rst.ble_adv[4] | ((uint16_t)(scan_result->scan_rst.ble_adv[3])) << 8;
+                            int i;
+                            for( i=0; i<3; i++){
+                                data_t.sensor_acc[i] = (uint16_t)(scan_result->scan_rst.ble_adv[i*2+5]) <<8 | (uint16_t)scan_result->scan_rst.ble_adv[i*2+6];
+                                //-- calculate acceleration, unit G, range -16, +16    
+                                data_t.acc[i] = (data_t.sensor_acc[i] * 1.0) / (32768.0/16.0);
+
+                                data_t.sensor_gyro[i] = (uint16_t)(scan_result->scan_rst.ble_adv[i*2+11]) <<8 | (uint16_t)scan_result->scan_rst.ble_adv[i*2+12];
+                                //-- calculate rotation, unit deg/s, range -250, +250
+                                data_t.gyro[i] = (data_t.sensor_gyro[i] * 1.0) / (65536.0 / 500.0);
+
+                                data_t.sensor_mag[i] = (uint16_t)(scan_result->scan_rst.ble_adv[i*2+17]) <<8 | (uint16_t)scan_result->scan_rst.ble_adv[i*2+18];
+                                //-- calculate magnetic field, unit microtesla, range -250, +250
+                                data_t.mag[i] = (data_t.sensor_mag[i] * 1.0) / (65536.0 / 500.0);
+                            }
+
+                            
+                            char cPayload[500];
+                            sprintf(cPayload,
+                                "{\"seq_no\": %d, \"esp_mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\", \"sensor_id\": %d, \"rssi\": %d, \"sensor_acc_x\": %f, \"sensor_acc_y\": %f, \"sensor_acc_z\": %f, \"sensor_gyro_x\": %f, \"sensor_gyro_y\": %f, \"sensor_gyro_z\": %f, \"sensor_mag_x\": %f, \"sensor_mag_y\": %f, \"sensor_mag_z\": %f}",
+                                data_t.seq_no, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], data_t.sensor_id, data_t.sensor_rssi, 
+                                data_t.acc[0], data_t.acc[1], data_t.acc[2], 
+                                data_t.gyro[0], data_t.gyro[1], data_t.gyro[2],
+                                data_t.mag[0], data_t.mag[1], data_t.mag[2]);
+                            esp_mqtt_client_publish(client, "/topic/qos1", cPayload, 0, 1, 0);
+                            //esp_log_buffer_hex("JSON data",cPayload,500);
+                        }
+
                     }
                     break;
                 }
@@ -262,6 +306,8 @@ void app_main()
     esp_bt_controller_enable(ESP_BT_MODE_BLE); // above functions are essential.
  
     esp_device_init();
+    
+    esp_wifi_get_mac(ESP_MAC_WIFI_STA, mac);
 
     mqtt_app_start();
 
