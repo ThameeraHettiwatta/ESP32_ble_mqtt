@@ -137,10 +137,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 static void mqtt_app_start(void)
 {
     esp_mqtt_client_config_t mqtt_cfg = {
-        // .uri = "mqtt://mqtt_server:1234@192.168.43.187:1883", //lahiru
-        // .uri = "mqtt://mqtt_server:1234@192.168.8.102:1883", //thameera
-        .uri = "mqtt://twhkvnkt:0qLBb25EOa3T@m11.cloudmqtt.com:17595", //cloud mqtt
 
+        ////.uri = "mqtt://192.168.43.187:1883", //lahiru
+        //.uri = "mqtt://mqtt_server:1234@192.168.8.102:1883", //thameera
+        .uri = "mqtt://twhkvnkt:0qLBb25EOa3T@m11.cloudmqtt.com:17595", //cloud mqtt
     };
 
     client = esp_mqtt_client_init(&mqtt_cfg);
@@ -186,6 +186,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                         int data_len;
                         uint16_t nework_id;
 
+
                         // The received adv data is a correct eddystone frame packet.
                         // Here, we get the eddystone infomation in eddystone_res, we can use the data in res to do other things.
                         // For example, just print them:
@@ -224,7 +225,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                             
                             char cPayload[500];
                             sprintf(cPayload,
-                                "{\"seq_no\": %d, \"esp_mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\", \"sensor_id\": %d, \"rssi\": %d, \"sensor_acc_x\": %f, \"sensor_acc_y\": %f, \"sensor_acc_z\": %f, \"sensor_gyro_x\": %f, \"sensor_gyro_y\": %f, \"sensor_gyro_z\": %f, \"sensor_mag_x\": %f, \"sensor_mag_y\": %f, \"sensor_mag_z\": %f}",
+                                "{\"seq_no\": %d, \"mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\", \"snsr_id\": %d, \"rssi\": %d, \"acc_x\": %f, \"acc_y\": %f, \"acc_z\": %f, \"gyr_x\": %f, \"gyr_y\": %f, \"gyr_z\": %f, \"mag_x\": %f, \"mag_y\": %f, \"mag_z\": %f}",
                                 data_t.seq_no, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], data_t.sensor_id, data_t.sensor_rssi, 
                                 data_t.acc[0], data_t.acc[1], data_t.acc[2], 
                                 data_t.gyro[0], data_t.gyro[1], data_t.gyro[2],
@@ -232,7 +233,6 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t* par
                             esp_mqtt_client_publish(client, "/topic/qos1", cPayload, 0, 1, 0);
                             //esp_log_buffer_hex("JSON data",cPayload,500);
                         }
-
                     }
                     break;
                 }
